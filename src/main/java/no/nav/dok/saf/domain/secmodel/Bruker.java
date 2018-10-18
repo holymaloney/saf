@@ -4,6 +4,6 @@ import java.util.List;
 
 public class Bruker {
     String aktoerId;
-    List<Tema> temaer;
+    List<Sak> temaer;
     List<Ident> historiskeIdenter;
 }
