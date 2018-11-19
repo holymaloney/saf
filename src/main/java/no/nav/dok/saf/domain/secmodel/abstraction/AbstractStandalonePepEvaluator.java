@@ -1,65 +1,68 @@
 package no.nav.dok.saf.domain.secmodel.abstraction;
 
-import no.nav.dok.saf.domain.secmodel.pep.PepEvaluator;
-
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+
+/**
+ * BrukerStandalonePepEvaluator brukerEvaluator = new BrukerStandalonePepEvaluator(null, brukerDataFetcher, pep1);
+ * SakStandalonePepEvaluator sakEvaluator = new SakStandalonePepEvaluator(brukerEvaluator, sakDataFetcher, pep2);
+ * JournalpostStandalonePepEvaluator jpEvaluator= new JournalpostStandalonePepEvaluator(sakEvaluator, jpDataFetcher, pep3);
+ *
+ * @param <T>
+ */
 public abstract class AbstractStandalonePepEvaluator<T extends SecModel> implements StandalonePepEvaluator<T> {
     StandalonePepEvaluator parent;
     SecModelDataFetcher<T> dataFetcher;
-    PepEvaluator<T> pepX;
+    Pep<T> pep;
 
 
-    public AbstractStandalonePepEvaluator(StandalonePepEvaluator parent) {
+    public AbstractStandalonePepEvaluator(StandalonePepEvaluator parent, SecModelDataFetcher<T> dataFetcher, Pep<T> pep) {
         this.parent = parent;
+        this.dataFetcher = dataFetcher;
+        this.pep = pep;
     }
 
-    /*
-     - populate current entity, e.g. sak  - key saksref parameter
-            - populate aktoerId parameter from sak
-         - fetchAndFilterAndEnforce pep2 - tematilgang?
-            - store/cache saksbehandler, tema, accessDecision (in pep2)?
-         - has sibline? - if bidragssak
-                        - populate saksparter (sibling may be multi)
-                        - fetchAndFilterAndEnforce pep3 - kode6/7/egenansatt/§19 on each part
-     - parent is bruker - is bruker evaluated?
-                        - if no enter parent bruker
-                        - populate parent entity, bruker - key aktoerId parameter
-                        - fetchAndFilterAndEnforce pep1 kode6/7/egenansatt
 
-
-      - populate current entity, e.g. dokumentInfo - key dokumentInfo and variantformat parameters
-        - if begrensning on dokumentInfo/variantformat fetchAndFilterAndEnforce pep5
-      - parent is Journalpost - is journalpost evaluated?
-            -if no enter parent Journalpost
-            - populate parent entity, Journalpost - key journalpostId parameter
-                 - populate saksref parameter from JP
-            - if begrensning and/or journalstatus protected, fetchAndFilterAndEnforce pep3
-      - parent is Sak - is sak evaluated?
-                      if no enter parent Sak
-                      ... etc
-
-       List<T> fetchAndFilterAndEnforce(parameterContext, accessDecisionContext, secModelContext)
-
-
+    /**
+     * This method will fetch and filter data from the repo using a DataFetcher and the parameterContext,
+     * and will further filter the result using the configured Pep.
+     * If parent is not null, the method will call fetchAndFilterAndEnforce on parent objects all the way to
+     * the root of the tree. The root parent will have a null parent.
+     * If any of the parent searches results in an empty stream, this either means there are no search results or
+     * that all results have been filtered away by access denied in ABAC.
+     * @param parameterContext
+     * @param accessDecicionContext
+     * @return
      */
 
     @Override
-    public void fetchAndFilterAndEnforce(boolean evaluateParent, ParameterContext parameterContext, AccessDecisionContext accessDecicionContext, SecurityModelWorld securityModelWorld) {
+    public Stream<T> fetchAndFilterAndEnforce(ParameterContext parameterContext, AccessDecisionContext accessDecicionContext) {
         List<T> secModelResult = dataFetcher.fetchAndFilter(parameterContext);
 
-        if (evaluateParent) {
-            Map<String, Object> parentSearchParameters = extractParentSearchParameter(secModelResult);
+        if (parent != null) {
+            Map<String, ? extends Object> parentSearchParameters = extractParentSearchParameter(secModelResult);
             parameterContext.addSearchParameters(parentSearchParameters);
-            parent.fetchAndFilterAndEnforce(evaluateParent, parameterContext, accessDecicionContext, securityModelWorld );
+            Stream parentStream = parent.fetchAndFilterAndEnforce(parameterContext, accessDecicionContext);
+            if (((List)parentStream.collect(Collectors.toList())).isEmpty()) {
+                return Stream.empty();
+            }
         }
 
-        secModelResult.stream().filter( e -> pepX.hasAccesOn(e, accessDecicionContext, securityModelWorld));
+        return secModelResult.stream().filter( e -> pep.hasAccesOn(e, accessDecicionContext));
 
     }
 
-    abstract Map<String, Object> extractParentSearchParameter(List<T> secModelResult);
+    /**
+     * Extract the neccesary search keys from the secModelResult to populate the parent SecModel entity.
+     * For Journalpost, the necessary keys to populate the above level is saksref + arkivsaksystem,
+     * For Sak, the necessary key to populate the above level is aktoerId.
+     * @param secModelResult
+     * @return
+     */
+    abstract Map<String, ? extends Object> extractParentSearchParameter(List<T> secModelResult);
 
 
 }

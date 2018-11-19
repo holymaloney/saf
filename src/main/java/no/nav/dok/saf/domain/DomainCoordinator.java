@@ -6,7 +6,9 @@ import graphql.schema.DataFetchingEnvironment;
 import no.nav.dok.saf.domain.secmodel.Bruker;
 import no.nav.dok.saf.domain.secmodel.Journalpost;
 import no.nav.dok.saf.domain.secmodel.Sak;
-import no.nav.dok.saf.domain.secmodel.pep.PepEvaluator;
+import no.nav.dok.saf.domain.secmodel.abstraction.AccessDecisionContext;
+import no.nav.dok.saf.domain.secmodel.abstraction.ParameterContext;
+import no.nav.dok.saf.domain.secmodel.abstraction.Pep;
 import no.nav.dok.saf.domain.secmodel.repo.SecModelRepo;
 import no.nav.dok.saf.domain.viewmodel.repo.ViewModelRepo;
 
@@ -20,19 +22,19 @@ public class DomainCoordinator implements BatchedDataFetcher {
     SecModelRepo secModelRepo;
     ViewModelRepo viewModelRepo;
 
-    PepEvaluator<Bruker> pep1;
-    PepEvaluator<Sak> pep2;
-    PepEvaluator<Journalpost> pep3;
+    Pep<Bruker> pep1;
+    Pep<Sak> pep2;
+    Pep<Journalpost> pep3;
 
-    public List<no.nav.dok.saf.domain.viewmodel.Journalpost> getJournalposterForBruker(String aktørId, List<String> temaer, List<String> journalStatuser, DataFetchingEnvironment dataFetchingEnvironment) {
+    public List<no.nav.dok.saf.domain.viewmodel.Journalpost> getJournalposterForBruker(String aktørId, List<String> temaer, List<String> journalStatuser, AccessDecisionContext accessDecisionContext) {
         Bruker bruker = secModelRepo.getBrukerForAktør(aktørId);
-        if (!pep1.hasAccesOn(bruker, dataFetchingEnvironment)) return Lists.newArrayList();
+        if (!pep1.hasAccesOn(bruker, accessDecisionContext)) return Lists.newArrayList();
 
         List<Sak> sakerForBruker = secModelRepo.getSakerForBruker(bruker, temaer);
-        List<Sak> filteredSakerForBruker = sakerForBruker.stream().filter(sak -> pep2.hasAccesOn(sak, dataFetchingEnvironment)).collect(Collectors.toList());
+        List<Sak> filteredSakerForBruker = sakerForBruker.stream().filter(sak -> pep2.hasAccesOn(sak, accessDecisionContext)).collect(Collectors.toList());
 
         List<Journalpost> journalposter = secModelRepo.getJournalposterForSaker(filteredSakerForBruker, null, null, null, -1, -1);
-        Stream<Journalpost> filteredJournalposter = journalposter.stream().filter(journalpost -> pep3.hasAccesOn(journalpost, dataFetchingEnvironment));
+        Stream<Journalpost> filteredJournalposter = journalposter.stream().filter(journalpost -> pep3.hasAccesOn(journalpost, accessDecisionContext));
 
         List<Long> journalpostIder = filteredJournalposter.map( jp -> jp.journalpostId).collect(Collectors.toList());
         List<no.nav.dok.saf.domain.viewmodel.Journalpost> viewModelJournalposter = viewModelRepo.getJournalposter(journalpostIder);
@@ -48,6 +50,6 @@ public class DomainCoordinator implements BatchedDataFetcher {
         List<String> temaer = environment.getArgument("temaer");
         List<String> journalStatuser = environment.getArgument("journalStatuser");
         Date opprettetFør = environment.getArgument("opprettet");
-        return getJournalposterForBruker(aktoerId, temaer, journalStatuser, environment);
+        return getJournalposterForBruker(aktoerId, temaer, journalStatuser, new AccessDecisionContext());
     }
 }
