@@ -89,5 +89,6 @@
     <orderEntry type="library" name="Maven: org.slf4j:slf4j-api:1.7.11" level="project" />
     <orderEntry type="library" name="Maven: com.graphql-java:graphiql-spring-boot-starter:3.6.0" level="project" />
     <orderEntry type="library" name="Maven: com.graphql-java:graphiql-spring-boot-autoconfigure:3.6.0" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.projectlombok:lombok:1.18.4" level="project" />
   </component>
 </module>

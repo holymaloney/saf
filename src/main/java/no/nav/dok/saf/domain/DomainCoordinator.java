@@ -36,7 +36,7 @@ public class DomainCoordinator implements BatchedDataFetcher {
         List<Journalpost> journalposter = secModelRepo.getJournalposterForSaker(filteredSakerForBruker, null, null, null, -1, -1);
         Stream<Journalpost> filteredJournalposter = journalposter.stream().filter(journalpost -> pep3.hasAccesOn(journalpost, accessDecisionContext));
 
-        List<Long> journalpostIder = filteredJournalposter.map( jp -> jp.journalpostId).collect(Collectors.toList());
+        List<String> journalpostIder = filteredJournalposter.map( jp -> jp.getJournalpostId()).collect(Collectors.toList());
         List<no.nav.dok.saf.domain.viewmodel.Journalpost> viewModelJournalposter = viewModelRepo.getJournalposter(journalpostIder);
 
         // Ide1: mest effektivt å filtrere bort dokumenter etter fetch?

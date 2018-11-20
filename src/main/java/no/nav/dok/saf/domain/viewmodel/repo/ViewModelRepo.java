@@ -5,5 +5,5 @@ import no.nav.dok.saf.domain.viewmodel.Journalpost;
 import java.util.List;
 
 public interface ViewModelRepo {
-    List<Journalpost> getJournalposter(List<Long> journalpostIder, String ... søkeparametre);
+    List<Journalpost> getJournalposter(List<String> journalpostIder, String ... søkeparametre);
 }
