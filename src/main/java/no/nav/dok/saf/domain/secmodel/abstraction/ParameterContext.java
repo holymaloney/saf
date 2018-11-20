@@ -6,7 +6,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ParameterContext {
-    private final ConcurrentHashMap<String, Object> parameterMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Object> parameterMap;
+
+    public ParameterContext() {
+        parameterMap = new ConcurrentHashMap<>();
+    }
+
+    public ParameterContext(Map<String, ? extends Object> parameterMap) {
+        this.parameterMap = new ConcurrentHashMap<>(parameterMap);
+    }
 
     public void addSearchParameters(Map<String, ? extends Object> parentSearchParameters) {
         parameterMap.putAll(parentSearchParameters);
@@ -21,7 +29,7 @@ public class ParameterContext {
     }
 
     public String getStringParameter(String parameterName) {
-        return parameterMap.get(parameterName).toString();
+        return parameterMap.containsKey(parameterName) ? parameterMap.get(parameterName).toString() : null;
     }
 
     public List<String> getListParameter(String parameterName) {

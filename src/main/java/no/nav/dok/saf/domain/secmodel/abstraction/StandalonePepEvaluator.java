@@ -13,6 +13,7 @@ import java.util.stream.Stream;
  *
  * @param <T>
  */
+
 public class StandalonePepEvaluator<T extends SecModel> {
     StandalonePepEvaluator parent;
     SecModelDataFetcher<T> dataFetcher;
@@ -45,19 +46,29 @@ public class StandalonePepEvaluator<T extends SecModel> {
      * @return
      */
 
-    public Stream<T> fetchAndFilterAndEnforce(ParameterContext parameterContext, AccessDecisionContext accessDecicionContext) {
+    public List<T> fetchAndFilterAndEnforce(ParameterContext parameterContext, AccessDecisionContext accessDecicionContext) {
         List<T> secModelResult = dataFetcher.fetchAndFilter(parameterContext);
 
+        Stream<T> allowedResult = secModelResult.stream().filter(e -> pep.hasAccesOn(e, accessDecicionContext));
+
         if (parent != null) {
-            Map<String, ? extends Object> parentSearchParameters = parameterAdapter.extractSearchParameter(secModelResult);
-            parameterContext.addSearchParameters(parentSearchParameters);
-            Stream parentStream = parent.fetchAndFilterAndEnforce(parameterContext, accessDecicionContext);
-            if (((List)parentStream.collect(Collectors.toList())).isEmpty()) {
-                return Stream.empty();
-            }
+            return
+            allowedResult.filter( e ->
+                    {
+                            ParameterContext innerParameterContext = parameterAdapter.extractSearchParameter(e);
+                            List parentResult = parent.fetchAndFilterAndEnforce(innerParameterContext, accessDecicionContext);
+                            if (parentResult.isEmpty()) {
+                                return false;
+                            } else {
+                                return true;
+                            }
+                    }
+            ).collect(Collectors.toList());
+
+        } else {
+            return allowedResult.collect(Collectors.toList());
         }
 
-        return secModelResult.stream().filter( e -> pep.hasAccesOn(e, accessDecicionContext));
 
     }
 

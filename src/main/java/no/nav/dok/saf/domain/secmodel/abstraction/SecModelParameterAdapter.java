@@ -1,6 +1,5 @@
 package no.nav.dok.saf.domain.secmodel.abstraction;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -15,8 +14,8 @@ public interface SecModelParameterAdapter<T> {
      * For Sak, the necessary key to populate the above level is aktoerId.
      *
      * The resulting map will be appended into the ParameterContext in the StandalonePepEvaluator
-     * @param secModelResult
+     * @param secModelEntity
      * @return map of search parameters
      */
-    Map<String, ? extends Object> extractSearchParameter(List<T> secModelResult);
+    ParameterContext extractSearchParameter(T secModelEntity);
 }

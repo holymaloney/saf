@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -38,7 +39,7 @@ public class StandalonePepEvaluatorTest {
         @Override
         public List<Bruker> fetchAndFilter(ParameterContext parameterContext) {
             List<Bruker> brukers = Lists.newArrayList(Bruker.builder().aktoerId("123456789").build());
-            return brukers.stream().filter(bruker -> parameterContext.getListParameter("aktoerIds").contains(bruker.getAktoerId())).collect(Collectors.toList());
+            return brukers.stream().filter(bruker -> parameterContext.getStringParameter("aktoerId").equals(bruker.getAktoerId())).collect(Collectors.toList());
         }
     }
 
@@ -52,12 +53,10 @@ public class StandalonePepEvaluatorTest {
     private class SakParameterAdapter implements SecModelParameterAdapter<Sak> {
 
         @Override
-        public Map<String, ?> extractSearchParameter(List<Sak> secModelResult) {
-            List<String> aktoerIds = Lists.newArrayList();
-            secModelResult.forEach( sak -> aktoerIds.add(sak.getAktoerId()));
-            Map<String, List<String>> parameterMap = Maps.newHashMap();
-            parameterMap.put("aktoerIds", aktoerIds);
-            return parameterMap;
+        public ParameterContext extractSearchParameter(Sak sak) {
+            Map<String, String> parameterMap = Maps.newHashMap();
+            parameterMap.put("aktoerId", sak.getAktoerId());
+            return new ParameterContext(parameterMap);
         }
     }
 
@@ -65,14 +64,11 @@ public class StandalonePepEvaluatorTest {
 
         @Override
         public List<Sak> fetchAndFilter(ParameterContext parameterContext) {
-            List<Sak> saker = Lists.newArrayList(
-                    Sak.builder().aktoerId("123456789").arkivsakRef("234").arkivsakSystem("PEN").build(),
-                    Sak.builder().aktoerId("123456789").arkivsakRef("123").arkivsakSystem("FS22").build()
-            );
+            List<Sak> saker = Lists.newArrayList( sak1, sak2);
             return saker.stream().filter( sak ->
-                    (sak.getArkivsakSystem().equals("FS22") && parameterContext.getListParameter("gsakSaker").contains(sak.getArkivsakRef()))
-                    || (sak.getArkivsakSystem().equals("PEN") && parameterContext.getListParameter("psakSaker").contains(sak.getArkivsakRef()))
-            ).collect(Collectors.toList());
+                    sak.getArkivsakSystem().equals(parameterContext.getStringParameter("arkivSakSystem"))
+                            && sak.getArkivsakRef().equals(parameterContext.getStringParameter("arkivSakRef"))
+                    ).collect(Collectors.toList());
         }
     }
 
@@ -86,13 +82,11 @@ public class StandalonePepEvaluatorTest {
 
     private class JPParameterAdapter implements SecModelParameterAdapter<Journalpost> {
         @Override
-        public Map<String, ?> extractSearchParameter(List<Journalpost> secModelResult) {
-            List<String> psakSaker = secModelResult.stream().filter( jp -> jp.getArkivSakSystem().equals("PEN")).map(jp -> jp.getArkivSakRef()).collect(Collectors.toList());
-            List<String> gsakSaker = secModelResult.stream().filter( jp -> jp.getArkivSakSystem().equals("FS22")).map(jp -> jp.getArkivSakRef()).collect(Collectors.toList());
-            Map<String, List<String>> parameterMap = Maps.newHashMap();
-            parameterMap.put("gsakSaker", gsakSaker);
-            parameterMap.put("psakSaker", psakSaker);
-            return parameterMap;
+        public ParameterContext extractSearchParameter(Journalpost journalpost) {
+            Map<String, String> parameterMap = Maps.newHashMap();
+            parameterMap.put("arkivSakRef", journalpost.getArkivSakRef());
+            parameterMap.put("arkivSakSystem", journalpost.getArkivSakSystem());
+            return new ParameterContext(parameterMap);
         }
     }
 
@@ -103,7 +97,18 @@ public class StandalonePepEvaluatorTest {
                     Journalpost.builder().journalpostId("1234").arkivSakRef("123").arkivSakSystem("FS22").build(),
                     Journalpost.builder().journalpostId("2345").arkivSakRef("234").arkivSakSystem("PEN").build()
             );
-            return jps.stream().filter(jp -> jp.getJournalpostId().equals(parameterContext.getStringParameter("journalpostId"))).collect(Collectors.toList());
+            if (parameterContext.getListParameter("journalpostIds") != null) {
+                return jps.stream().filter(jp -> parameterContext.getListParameter("journalpostIds").contains(jp.getJournalpostId())).collect(Collectors.toList());
+            } else if (parameterContext.getStringParameter("journalpostId") != null){
+                return jps.stream().filter(jp -> jp.getJournalpostId().equals(parameterContext.getStringParameter("journalpostId"))).collect(Collectors.toList());
+            } else if (parameterContext.getListParameter("psakSaker") != null || parameterContext.getListParameter("gsakSaker") != null) {
+                return jps.stream().filter(jp ->
+                        parameterContext.getListParameter("gsakSaker").contains(jp.getArkivSakRef()) && jp.getArkivSakSystem().equals("FS22")
+                        || parameterContext.getListParameter("psakSaker").contains(jp.getArkivSakRef()) && jp.getArkivSakSystem().equals("PEN")
+                        ).collect(Collectors.toList());
+            } else {
+                return Lists.newArrayList();
+            }
         }
     }
 
@@ -120,6 +125,9 @@ public class StandalonePepEvaluatorTest {
 
     AccessDecisionContext accessDecisionContext;
     ParameterContext parameterContext;
+
+    Sak sak1 = Sak.builder().aktoerId("123456789").arkivsakRef("123").arkivsakSystem("FS22").build();
+    Sak sak2 = Sak.builder().aktoerId("123456789").arkivsakRef("234").arkivsakSystem("PEN").build();
 
 
     @Before
@@ -139,7 +147,7 @@ public class StandalonePepEvaluatorTest {
     @Test
     public void shouldReturnJournalpostInHappyPath() {
         parameterContext.addStringSearchParameter("journalpostId", "1234");
-        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext).collect(Collectors.toList());
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
         assertTrue(journalposts.size() == 1);
         assertThat(journalposts.get(0).getJournalpostId(), Is.is("1234"));
     }
@@ -149,9 +157,40 @@ public class StandalonePepEvaluatorTest {
         when(pep1.hasAccesOn(any(Bruker.class), any(AccessDecisionContext.class))).thenReturn(false);
 
         parameterContext.addStringSearchParameter("journalpostId", "1234");
-        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext).collect(Collectors.toList());
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
         assertTrue(CollectionUtils.isEmpty(journalposts));
     }
+
+    @Test
+    public void shouldSupportJournalpostListParameter() {
+        List<String> journalpostIds = Lists.newArrayList("1234", "2345");
+        parameterContext.addListSearchParameter("journalpostIds", journalpostIds);
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
+        assertTrue(journalposts.size() == 2);
+    }
+
+    @Test
+    public void shouldLimitAccessToOneSak() {
+        when(pep2.hasAccesOn(eq(sak1), any(AccessDecisionContext.class))).thenReturn(false);
+
+        List<String> journalpostIds = Lists.newArrayList("1234", "2345");
+        parameterContext.addListSearchParameter("journalpostIds", journalpostIds);
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
+        assertTrue(journalposts.size() == 1);
+        assertThat(journalposts.get(0).getJournalpostId(), Is.is("2345"));
+    }
+
+    @Test
+    public void shouldSupporSakListParameter() {
+        List<String> gsakSaker = Lists.newArrayList("123");
+        parameterContext.addListSearchParameter("gsakSaker", gsakSaker);
+        List<String> psakSaker = Lists.newArrayList("234");
+        parameterContext.addListSearchParameter("psakSaker", psakSaker);
+
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
+        assertTrue(journalposts.size() == 2);
+    }
+
 
 
 }
