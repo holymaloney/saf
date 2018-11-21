@@ -1,7 +1,6 @@
 package no.nav.dok.saf.domain.secmodel.abstraction;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -46,27 +45,34 @@ public class StandalonePepEvaluator<T extends SecModel> {
      * @return
      */
 
-    public List<T> fetchAndFilterAndEnforce(ParameterContext parameterContext, AccessDecisionContext accessDecicionContext) {
+    public List<T> fetchAndFilterAndEnforce(ParameterContext parameterContext, AccessDecisionContext accessDecicionContext, SecModelWorld secModelWorld) {
         List<T> secModelResult = dataFetcher.fetchAndFilter(parameterContext);
 
         Stream<T> allowedResult = secModelResult.stream().filter(e -> pep.hasAccesOn(e, accessDecicionContext));
 
         if (parent != null) {
-            return
-            allowedResult.filter( e ->
+            List<T> collect =
+                    allowedResult.filter(e ->
                     {
-                            ParameterContext innerParameterContext = parameterAdapter.extractSearchParameter(e);
-                            List parentResult = parent.fetchAndFilterAndEnforce(innerParameterContext, accessDecicionContext);
-                            if (parentResult.isEmpty()) {
-                                return false;
-                            } else {
-                                return true;
-                            }
+                        ParameterContext innerParameterContext = parameterAdapter.extractSearchParameter(e);
+                        List parentResult = parent.fetchAndFilterAndEnforce(innerParameterContext, accessDecicionContext, secModelWorld);
+                        if (parentResult.isEmpty()) {
+                            return false;
+                        } else {
+                            return true;
+                        }
                     }
             ).collect(Collectors.toList());
-
+            if (secModelWorld != null) {
+                secModelWorld.put(collect);
+            }
+            return collect;
         } else {
-            return allowedResult.collect(Collectors.toList());
+            List<T> collect = allowedResult.collect(Collectors.toList());
+            if (secModelWorld != null) {
+                secModelWorld.put(collect);
+            }
+            return collect;
         }
 
 

@@ -125,6 +125,7 @@ public class StandalonePepEvaluatorTest {
 
     AccessDecisionContext accessDecisionContext;
     ParameterContext parameterContext;
+    SecModelWorld secModelWorld;
 
     Sak sak1 = Sak.builder().aktoerId("123456789").arkivsakRef("123").arkivsakSystem("FS22").build();
     Sak sak2 = Sak.builder().aktoerId("123456789").arkivsakRef("234").arkivsakSystem("PEN").build();
@@ -142,14 +143,19 @@ public class StandalonePepEvaluatorTest {
         brukerPepEvaluator = new BrukerPepEvaluator(null, new BrukerDataFetcher(), pep1, null);
         sakPepEvaluator = new SakPepEvaluator(brukerPepEvaluator, new SakDataFetcher(), pep2, new SakParameterAdapter());
         jpPepEvaluator = new JPPepEvaluator(sakPepEvaluator, new JPDataFetcher(), pep3, new JPParameterAdapter());
+        secModelWorld = new SecModelWorld();
     }
 
     @Test
     public void shouldReturnJournalpostInHappyPath() {
         parameterContext.addStringSearchParameter("journalpostId", "1234");
-        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext, secModelWorld);
         assertTrue(journalposts.size() == 1);
         assertThat(journalposts.get(0).getJournalpostId(), Is.is("1234"));
+
+        assertTrue(secModelWorld.getBrukere().size() == 1);
+        assertTrue(secModelWorld.getSaker().size() == 1);
+        assertTrue(secModelWorld.getJournalposter().size() == 1);
     }
 
     @Test
@@ -157,7 +163,7 @@ public class StandalonePepEvaluatorTest {
         when(pep1.hasAccesOn(any(Bruker.class), any(AccessDecisionContext.class))).thenReturn(false);
 
         parameterContext.addStringSearchParameter("journalpostId", "1234");
-        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext, secModelWorld);
         assertTrue(CollectionUtils.isEmpty(journalposts));
     }
 
@@ -165,7 +171,7 @@ public class StandalonePepEvaluatorTest {
     public void shouldSupportJournalpostListParameter() {
         List<String> journalpostIds = Lists.newArrayList("1234", "2345");
         parameterContext.addListSearchParameter("journalpostIds", journalpostIds);
-        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext, secModelWorld);
         assertTrue(journalposts.size() == 2);
     }
 
@@ -175,7 +181,7 @@ public class StandalonePepEvaluatorTest {
 
         List<String> journalpostIds = Lists.newArrayList("1234", "2345");
         parameterContext.addListSearchParameter("journalpostIds", journalpostIds);
-        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext, secModelWorld);
         assertTrue(journalposts.size() == 1);
         assertThat(journalposts.get(0).getJournalpostId(), Is.is("2345"));
     }
@@ -187,7 +193,7 @@ public class StandalonePepEvaluatorTest {
         List<String> psakSaker = Lists.newArrayList("234");
         parameterContext.addListSearchParameter("psakSaker", psakSaker);
 
-        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext);
+        List<Journalpost> journalposts = jpPepEvaluator.fetchAndFilterAndEnforce(parameterContext, accessDecisionContext, secModelWorld);
         assertTrue(journalposts.size() == 2);
     }
 
